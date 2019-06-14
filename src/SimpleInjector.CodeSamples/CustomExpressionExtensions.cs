@@ -20,10 +20,11 @@ namespace SimpleInjector.CodeSamples
         }
 
         private static bool IsExpressionCustomExpressionPlaceholder(Expression expression,
-            out CustomExpression customExpression)
+            out ICustomExpression customExpression)
         {
             if (expression is ConstantExpression constantExpression &&
-                constantExpression.Value is Delegate d && d.Target is CustomExpression c)
+                constantExpression.Value is Delegate d &&
+                d.Target is ICustomExpression c)
             {
                 customExpression = c;
                 return true;
@@ -33,32 +34,46 @@ namespace SimpleInjector.CodeSamples
             return false;
         }
 
-        public static void RegisterExpression<TSubject>(this Container container, Expression<TSubject> e)
+        public static void RegisterExpression<TSubject>(this Container container, Expression<Func<ExpressionHelper, TSubject>> e)
             where TSubject : class
         {
-            var customExpression = new CustomExpression(e);
-            container.Register(customExpression.PlaceholderFunc<TSubject>);
+            var customExpression = new CustomExpression<TSubject>(e);
+            container.Register(customExpression.PlaceholderFunc);
         }
 
-        public static void RegisterExpression<TSubject>(this Container container, Expression<TSubject> e,
+        public static void RegisterExpression<TSubject>(this Container container, Expression<Func<ExpressionHelper, TSubject>> e,
             Lifestyle lifestyle)
             where TSubject : class
         {
-            var customExpression = new CustomExpression(e);
-            container.Register(customExpression.PlaceholderFunc<TSubject>, lifestyle);
+            var customExpression = new CustomExpression<TSubject>(e);
+            container.Register(customExpression.PlaceholderFunc, lifestyle);
         }
     }
 
-    public class CustomExpression
+    public class ExpressionHelper
     {
-        public Expression Expression { get; }
+        public T Resolve<T>() => throw new NotImplementedException();
 
-        public CustomExpression(Expression expression)
+        public T Resolve<T>(string key) => throw new NotImplementedException();
+    }
+
+    public interface ICustomExpression
+    {
+        Expression Expression { get; }
+    }
+
+    public class CustomExpression<TSubject> : ICustomExpression
+    {
+        Expression ICustomExpression.Expression => this.DelegateExpression;
+
+        public Expression<Func<ExpressionHelper, TSubject>> DelegateExpression { get; }
+
+        public CustomExpression(Expression<Func<ExpressionHelper, TSubject>> delegateExpression)
         {
-            this.Expression = expression;
+            this.DelegateExpression = delegateExpression;
         }
 
-        public TSubject PlaceholderFunc<TSubject>() => throw new NotImplementedException();
+        public TSubject PlaceholderFunc() => throw new NotImplementedException();
     }
     
     public class CustomExpressionExtensions
